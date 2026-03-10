@@ -18,7 +18,6 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -28,15 +27,17 @@ jobs:
           GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: echo "$GOOGLE_SERVICES" > app/google-services.json
 
-      - name: Generate Gradle Wrapper
+      - name: Download Gradle Wrapper JAR
         run: |
-          gradle wrapper --gradle-version 8.2 --distribution-type bin
+          mkdir -p gradle/wrapper
+          curl -L "https://github.com/gradle/gradle/raw/v8.4.0/gradle/wrapper/gradle-wrapper.jar" \
+            -o gradle/wrapper/gradle-wrapper.jar
           chmod +x gradlew
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: UPITracker-APK
@@ -44,16 +45,18 @@ jobs:
           retention-days: 90
 
       - name: Create Release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: UPI Tracker v1.0.${{ github.run_number }}
           body: |
-            ## 📲 Download & Install
-            1. Download **UPITracker-APK** below
-            2. Phone: Settings → Security → Enable Unknown Sources
-            3. Install APK → Allow SMS permission → Login with OTP → Done!
+            ## 📲 Install Instructions
+            1. Download **UPITracker-APK** zip below → extract the APK
+            2. Transfer APK to your Android phone
+            3. Settings → Security → Enable **Install Unknown Apps**
+            4. Tap APK → Install → Allow SMS permissions
+            5. Login with mobile number → OTP → Done! 🎉
           files: app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
