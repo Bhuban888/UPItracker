@@ -21,26 +21,22 @@ jobs:
       - name: Create google-services.json
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
 
-      - name: Fix Gradle Wrapper
+      - name: Install Gradle 8.4 directly
         run: |
-          mkdir -p gradle/wrapper
-          curl -L "https://repo1.maven.org/maven2/org/gradle/gradle-wrapper/8.4/gradle-wrapper-8.4.jar" \
-            -o gradle/wrapper/gradle-wrapper.jar 2>/dev/null || \
-          curl -L "https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradle/wrapper/gradle-wrapper.jar" \
-            -o gradle/wrapper/gradle-wrapper.jar 2>/dev/null || \
-          wget -q "https://services.gradle.org/distributions/gradle-8.4-bin.zip" -O /tmp/gradle.zip && \
-          unzip -q /tmp/gradle.zip -d /tmp/gradle-dist && \
-          cp /tmp/gradle-dist/gradle-8.4/lib/gradle-wrapper*.jar gradle/wrapper/gradle-wrapper.jar
-          ls -la gradle/wrapper/
-          chmod +x gradlew
+          wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip -O /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /opt/gradle
+          export PATH=$PATH:/opt/gradle/gradle-8.4/bin
+          echo "/opt/gradle/gradle-8.4/bin" >> $GITHUB_PATH
+          gradle --version
 
-      - name: Verify Wrapper
+      - name: Build APK with Gradle
         run: |
-          echo "Wrapper jar size: $(wc -c < gradle/wrapper/gradle-wrapper.jar) bytes"
-          java -cp gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain --version || true
+          gradle assembleDebug --no-daemon --stacktrace
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
 
-      - name: Build APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Find APK
+        run: find . -name "*.apk" -type f
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -50,17 +46,18 @@ jobs:
           retention-days: 90
 
       - name: Create Release
-        if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        if: success()
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: UPI Tracker v1.0.${{ github.run_number }}
           body: |
             ## 📲 How to Install
-            1. Download **UPITracker-APK** below
-            2. On your phone: Settings → Security → Enable Unknown Sources
-            3. Install the APK → Allow SMS permissions
-            4. Login with mobile number → OTP → Done! 🎉
+            1. Download UPITracker-APK zip → extract the APK file
+            2. Send APK to your Android phone
+            3. Settings → Security → Enable Unknown Sources
+            4. Tap APK → Install → Allow SMS permissions
+            5. Login with mobile number → OTP → Done! 🎉
           files: app/build/outputs/apk/debug/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
