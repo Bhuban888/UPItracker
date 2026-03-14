@@ -1,0 +1,1 @@
+-keep class com.upitracker.app.data.model.** { *; }
